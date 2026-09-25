@@ -121,7 +121,8 @@ func TestRecv(t *testing.T) {
 		defer stream.Close()
 
 		got, err := stream.Recv()
-		for ndx := 0; err == nil; ndx++ {
+		ndx := 0
+		for ; err == nil; ndx++ {
 			if diff := cmp.Diff(got, tst.want[ndx], cmp.Comparer(proto.Equal)); diff != "" {
 				t.Errorf("%s: got(-),want(+):\n%s", tst.name, diff)
 			}
@@ -129,6 +130,12 @@ func TestRecv(t *testing.T) {
 		}
 		if !errors.Is(err, io.EOF) {
 			t.Errorf("%s: expected %v but got %v", tst.name, io.EOF, err)
+		}
+		// Recv returning io.EOF on the first call is legitimate for an empty
+		// stream, so check the count too. Without this, a stream that drops
+		// every message still passes.
+		if ndx != len(tst.want) {
+			t.Errorf("%s: received %d messages, want %d", tst.name, ndx, len(tst.want))
 		}
 	}
 }
