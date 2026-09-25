@@ -86,15 +86,14 @@ func (s *ProtoJSONStream) Recv() (proto.Message, error) {
 	// Handle start-of-stream (which should be a JSON array)
 	if s.first {
 		s.first = false
-		kind := s.stream.PeekKind()
+		// ReadToken, not SkipValue: SkipValue treats a '[' as the start of a
+		// value and consumes the whole array, leaving nothing to decode.
+		tok, err := s.stream.ReadToken()
+		if err != nil {
+			return nil, err
+		}
 
-		if kind == jsontext.KindBeginArray {
-			// Read and discard the start of array.
-			err := s.stream.SkipValue()
-			if err != nil {
-				return nil, err
-			}
-		} else {
+		if tok.Kind() != jsontext.KindBeginArray {
 			// stream isn't a JSON array.
 			return nil, errBadOpening
 		}
@@ -104,8 +103,7 @@ func (s *ProtoJSONStream) Recv() (proto.Message, error) {
 	kind := s.stream.PeekKind()
 	if kind == jsontext.KindEndArray {
 		// We're at the end of the array.
-		err := s.stream.SkipValue()
-		if err != nil {
+		if _, err := s.stream.ReadToken(); err != nil {
 			return nil, err
 		}
 		return nil, io.EOF
